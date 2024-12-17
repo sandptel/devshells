@@ -46,6 +46,16 @@
     );
 }
 ```
+## Documentations 
+### mkShell official Docs
+https://nixos.org/manual/nixpkgs/stable/#sec-pkgs-mkShell
+
+### Flake Parts with all flake realted docs
+https://flake.parts
+
+### Good Old Wiki
+https://nixos.wiki/wiki/Flakes
+
 
 # Python  
 ## - python-flake.nix 
