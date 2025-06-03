@@ -12,7 +12,7 @@
         inherit (nixpkgs) lib;
         pkgs = nixpkgs.legacyPackages.${system};
         rpath = lib.makeLibraryPath (with pkgs; [
-          # openssl
+          openssl
           # libressl
         ]);
       in
@@ -25,18 +25,22 @@
             # pkg-config
           ];
 
-          # buildInputs = with pkgs; [
-          #   openssl
+          buildInputs = with pkgs; [
+            openssl
           #   # libressl
-          # ];
+          ];
 
           # defines the environment variables
-          OPENSSL_DIR= lib.makeLibraryPath (with pkgs; [  
-            # openssl 
-            ]);
-        
+          X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR = lib.makeLibraryPath (with pkgs; [
+            openssl
+          ]);
+
+          OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+          OPENSSL_LIB_DIR = "${pkgs.openssl}/lib";
+
+
           # shellHook = ''
-          #   export OPENSSL_DIR=${pkgs.openssl}
+          #   export X86_64_UNKNOWN_LINUX_GNU_OPENSSL_DIR=${pkgs.openssl}
           #   '';
 
           # links the library path dynamically to the shell
