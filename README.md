@@ -1,6 +1,53 @@
 # devshells
 ```nix
 {
+  description = "Development shell for building and testing a applications for cosmic desktop environment";
+  inputs = {
+    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  };
+
+  outputs = { self, flake-utils, nixpkgs }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        inherit (nixpkgs) lib;
+        pkgs = nixpkgs.legacyPackages.${system};
+        # rpath = lib.makeLibraryPath (with pkgs; [
+        #   openssl
+        #   # libressl
+        # ]);
+        nativeBuildInputs = with pkgs; [ just pkg-config autoPatchelfHook ];
+          buildInputs = with pkgs; [
+            openssl
+            libxkbcommon
+            glib # For gobject
+            libglvnd # For libEGL
+            libpulseaudio
+            dbus.dev
+            wayland
+            libglvnd
+          ];
+      in
+      {
+        devShells.default = pkgs.mkShell {
+
+          inherit buildInputs nativeBuildInputs;
+
+          shellHook = ''
+            export XDG_RUNTIME_DIR=${pkgs.xdg-desktop-portal}
+          '';
+          LD_LIBRARY_PATH = lib.makeLibraryPath (buildInputs ++ nativeBuildInputs);
+        };
+      }
+    );
+}
+```
+
+
+
+
+```nix
+{
   inputs = {
     flake-utils.url = "github:numtide/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
