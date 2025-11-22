@@ -1,87 +1,62 @@
 {
-  description = "Minimal Rust development environment with Nix flake";
+  description = "Rust Dev Environment (Hybrid: Nix Env + User VSCode Config)";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      utils,
-    }:
-    utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (
-      system:
+  outputs = { self, nixpkgs, flake-utils, rust-overlay, ... }:
+    flake-utils.lib.eachSystem [ "x86_64-linux" "aarch64-linux" ] (system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        inherit (nixpkgs) lib;
-        runtimeDependencies = with pkgs; [
-          # openssl # SSL runtime library
-          # zlib # Compression library
-          # # Add other runtime libraries your Rust app needs
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+          config.allowUnfree = true;
+        };
+        inherit (pkgs) lib;
+
+        # 1. The Toolchain
+        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
+        };
+
+        # 2. Libraries
+        libraries = with pkgs; [
+          openssl sqlite udev alsa-lib
+          wayland vulkan-loader vulkan-headers fontconfig freetype libinput libxkbcommon
+          xorg.libxcb xorg.libX11 xorg.libXcursor xorg.libXrandr xorg.libXi xorg.libXext
         ];
 
-        nativeBuildInputs = with pkgs; [
-          # pkg-config # For finding system libraries
-          # cmake # Build system (for some native deps)
-          # openssl.dev # SSL development headers
-        ];
-
-        buildInputs = with pkgs; [
-          cargo
-          rustc
-          rustfmt
-
-          # # Additional Rust tools
-          # clippy # Rust linter
-          # rust-analyzer # Language server
-          # rustup # Rust toolchain manager
-          # cargo-watch # Auto-rebuild on file changes
-          # cargo-edit # cargo add/rm/upgrade commands
-          # cargo-audit # Security vulnerability scanner
-          # cargo-deny # Dependency checker
-          # cargo-outdated # Check for outdated dependencies
-
-          # # Development tools
-          # gdb # Debugger
-          # valgrind # Memory debugger
-          # strace # System call tracer
-        ];
+        # 3. Build Tools
+        nativeBuildInputs = with pkgs; [ pkg-config cmake clang mold ];
 
       in
       {
         devShells.default = pkgs.mkShell {
-          inherit buildInputs nativeBuildInputs runtimeDependencies;
+          buildInputs = [ rustToolchain pkgs.vscode ] ++ libraries; # Just standard vscode
+          inherit nativeBuildInputs;
 
-          LD_LIBRARY_PATH = lib.makeLibraryPath (buildInputs ++ nativeBuildInputs ++ runtimeDependencies);
-          # RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-          # # Compiler flags
-          # RUSTFLAGS = "-C link-arg=-Wl,-rpath,${lib.makeLibraryPath runtimeDependencies}";
-          # # C/C++ toolchain (useful for native dependencies)
-          # CC = "${pkgs.gcc}/bin/gcc";
-          # CXX = "${pkgs.gcc}/bin/g++";
+          # 4. Environment Variables (The Magic Sauce)
+          RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
+          LD_LIBRARY_PATH = lib.makeLibraryPath libraries;
+          PKG_CONFIG_PATH = "${lib.makeSearchPathOutput "dev" "lib/pkgconfig" libraries}";
+          RUSTFLAGS = "-C link-arg=-fuse-ld=mold";
 
-          packages = with pkgs; [
-            # Additional tools beyond buildInputs
-            git
-            # curl
-            # jq
-            # tree
-            # htop
-          ];
-
+          # 5. Shell Hook: Launch VS Code with the right env, but USER config
           shellHook = ''
-            echo "🦀 Welcome to Rust development environment!"
-            echo "Rust version: $(rustc --version)"
-            echo "Cargo version: $(cargo --version)"
-
-            # Export additional variables
-            export RUST_LOG=debug
-            export CARGO_INCREMENTAL=1
+            echo "✅ Nix DevShell Active (Hybrid Mode)"
+            echo "   - Rust: $(rustc --version)"
+            echo ""
+            echo "ℹ️  To run VS Code with your USER extensions + THIS environment:"
+            echo "   $ code ."
+            echo ""
+            echo "   (This uses your normal ~/.vscode/extensions but injects the Rust paths)"
           '';
-
         };
       }
     );
